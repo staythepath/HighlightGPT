@@ -1,12 +1,9 @@
-// Variables
 let currentBox = null;
 let timeoutId = null;
 let selectedText = '';
 let isMouseInsideWindow = true;
 let mousePosition = { x: 0, y: 0 };
-let isBoxDisplayed = false; 
 
-// Style for disabling text selection while resizing the box
 const noSelectStyle = `
   .noselect {
     -webkit-touch-callout: none;
@@ -18,12 +15,12 @@ const noSelectStyle = `
   }
 `;
 
-// Add noSelectStyle to the document head
 const styleElement = document.createElement("style");
+
 styleElement.textContent = noSelectStyle;
+
 document.head.appendChild(styleElement);
 
-// Helper function to check if an element is a text node
 function isTextElement(element) {
   while (element) {
     if (element.nodeType === Node.TEXT_NODE) {
@@ -34,18 +31,23 @@ function isTextElement(element) {
   return false;
 }
 
-// Store highlighted text and show the loading box
 function storeHighlightedText() {
-  if (isBoxDisplayed) { // Check if an explanation box is already being displayed
-    return; // Return without doing anything
-  }
-
   selectedText = window.getSelection().toString().trim();
   if (selectedText) {
     console.log("Stored text:", selectedText);
 
     const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
-    const boxPosition = getBoxPosition(rect);
+  let boxPosition = {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height,
+  };
+
+  if (mousePosition.x < 0 || mousePosition.x > window.innerWidth || mousePosition.y < 0 || mousePosition.y > window.innerHeight) {
+    boxPosition = {
+      x: window.innerWidth / 2 - 200, // 200 is half the box width
+      y: window.innerHeight / 2,
+    };
+  }
 
     // Display the loading box
     showLoadingBox(boxPosition);
@@ -60,74 +62,55 @@ function storeHighlightedText() {
   }
 }
 
-function getBoxPosition(rect) {
-  let boxPosition = {
-    x: rect.x + rect.width / 2,
-    y: rect.y + rect.height,
-  };
-
-  if (mousePosition.x < 0 || mousePosition.x > window.innerWidth || mousePosition.y < 0 || mousePosition.y > window.innerHeight) {
-    boxPosition = {
-      x: window.innerWidth / 2 - 200, // 200 is half the box width
-      y: window.innerHeight / 2,
-    };
-  }
-
-  return boxPosition;
-}
-
-// Event listeners for mouseenter and mouseleave
 document.addEventListener("mouseenter", () => {
   isMouseInsideWindow = true;
   timeoutId = setTimeout(storeHighlightedText, 2000);
 });
-document.addEventListener("mouseout", (event) => {
-  if (event.relatedTarget === null) {
-    isMouseInsideWindow = false;
-  }
+
+
+document.addEventListener("mouseleave", () => {
+  isMouseInsideWindow = false;
+  timeoutId = setTimeout(storeHighlightedText, 2000);
 });
 
 
-// Event listeners for mousedown and mouseup
 document.addEventListener("mousedown", () => {
   if (isMouseInsideWindow) {
     timeoutId = setTimeout(storeHighlightedText, 2000);
   }
 });
+
 document.addEventListener("mouseup", (event) => {
   mousePosition.x = event.clientX;
   mousePosition.y = event.clientY;
 });
+
+
 document.addEventListener("mouseup", () => {
   clearTimeout(timeoutId);
 });
 
-// Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "showExplanation") {
     const { explanation, position } = request.data;
     showExplanationBox(explanation, position);
-    isBoxDisplayed = true; // Set the flag to true when the box is displayed
   }
 });
 
-// Functions for showing and removing the loading box
 function showLoadingBox(position) {
   const loadingBox = document.createElement("div");
-  Object.assign(loadingBox.style, {
-    position: "fixed",
-    width: "150px",
-    left: `${position.x}px`,
-    top: `${position.y}px`,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    color: "white",
-    border: "3px solid gray",
-    padding: "10px",
-    zIndex: 10000,
-  });
-
   loadingBox.id = "loadingBox";
+  loadingBox.style.position = "fixed";
+  loadingBox.style.width = "150px";
+  loadingBox.style.left = `${position.x}px`;
+  loadingBox.style.top = `${position.y}px`;
+  loadingBox.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+  loadingBox.style.color = "white";
+  loadingBox.style.border = "3px solid gray";
+  loadingBox.style.padding = "10px";
+  loadingBox.style.zIndex = 10000;
   loadingBox.textContent = "Loading";
+
   document.body.appendChild(loadingBox);
 
   let ellipsesCount = 0;
@@ -149,58 +132,49 @@ function removeLoadingBox() {
   }
 }
 
-// Function for showing the explanation box
+
 function showExplanationBox(text, position) {
-  // 1. Remove the existing box and loading box
   if (currentBox) {
-    document.body.removeChild(currentBox);
+    document.body.removeChild(currentBox); // Remove the existing box if there is one
   }
+  
   removeLoadingBox();
 
-  // 2. Create the main box
   const box = document.createElement("div");
-  Object.assign(box.style, {
-    position: "fixed",
-    width: "400px",
-    left: `${position.x}px`,
-    top: `${position.y}px`,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    color: "white",
-    border: "3px solid gray",
-    padding: "10px",
-    zIndex: 10000,
-  });
+  box.style.position = "fixed";
+  box.style.width = "400px";
+  box.style.left = `${position.x}px`;
+  box.style.top = `${position.y}px`;
+  box.style.backgroundColor = "rgba(0, 0, 0, 0.6)"; // Changed background to slightly transparent black
+  box.style.color = "white";
+  box.style.border = "3px solid gray";
+  box.style.padding = "10px";
+  box.style.zIndex = 10000;
 
-  // 3. Create and add the resize handle
+  // Create a resize handle
   const resizeHandle = document.createElement("div");
-  Object.assign(resizeHandle.style, {
-    position: "absolute",
-    width: "10px",
-    height: "10px",
-    bottom: "0",
-    right: "0",
-    cursor: "se-resize",
-    backgroundColor: "gray",
-  });
+  resizeHandle.style.position = "absolute";
+  resizeHandle.style.width = "10px";
+  resizeHandle.style.height = "10px";
+  resizeHandle.style.bottom = "0";
+  resizeHandle.style.right = "0";
+  resizeHandle.style.cursor = "se-resize";
+  resizeHandle.style.backgroundColor = "gray";
   box.appendChild(resizeHandle);
 
-  // 4. Create and add the copy button
   const copyButton = document.createElement("button");
-  Object.assign(copyButton.style, {
-    position: "absolute",
-    top: "5px",
-    right: "5px",
-    width: "25px",
-    height: "25px",
-    borderRadius: "4px",
-    backgroundColor: "gray",
-    color: "black",
-    border: "1px solid gray",
-  });
   copyButton.textContent = "📋";
+  copyButton.style.position = "absolute";
+  copyButton.style.top = "5px";
+  copyButton.style.right = "5px";
+  copyButton.style.width = "25px";
+  copyButton.style.height = "25px";
+  copyButton.style.borderRadius = "4px";
+  copyButton.style.backgroundColor = "gray";
+  copyButton.style.color = "black";
+  copyButton.style.border = "1px solid black";
   box.appendChild(copyButton);
 
-  // 5. Add event listener for copying the text
   copyButton.addEventListener("click", () => {
     const textToCopy = contentDiv.textContent;
     const tempTextArea = document.createElement("textarea");
@@ -211,14 +185,22 @@ function showExplanationBox(text, position) {
     document.body.removeChild(tempTextArea);
   });
 
-  // 6. Make the box draggable
+  box.appendChild(copyButton);
+
+
+
+  // Make the box draggable
   box.onmousedown = dragMouseDown;
   let dragOffset = { x: 0, y: 0 };
 
   function dragMouseDown(e) {
+    // Check if the user clicked on the text content
     if (isTextElement(e.target)) {
+      // If the mouse is over a text element, allow text selection
       return;
     }
+  
+    // Otherwise, allow dragging of the box
     isDragging = true;
     dragOffset.x = e.clientX - box.offsetLeft;
     dragOffset.y = e.clientY - box.offsetTop;
@@ -236,57 +218,60 @@ function showExplanationBox(text, position) {
     document.onmousemove = null;
     document.onmouseup = null;
   }
-   // 7. Add event listeners for resizing the box
-   let resizing = false;
 
-   resizeHandle.addEventListener("mousedown", (e) => {
-     e.stopPropagation();
-     resizing = true;
-     contentDiv.classList.add("noselect");
-   });
-   
-   document.addEventListener("mousemove", (e) => {
-     if (resizing) {
-       const newWidth = e.clientX - box.offsetLeft + 5;
-       const newHeight = e.clientY - box.offsetTop + 5;
-       box.style.width = `${newWidth}px`;
-       box.style.height = `${newHeight}px`;
-     }
-   });
-   
-   document.addEventListener("mouseup", () => {
-     resizing = false;
-     contentDiv.classList.remove("noselect");
-   });
- // 8. Create the content div and add the text
- const contentDiv = document.createElement("div");
- contentDiv.textContent = text;
- Object.assign(contentDiv.style, {
-   overflow: "auto",
-   width: "100%",
-   height: "100%",
- });
- box.appendChild(contentDiv);
+  // Add event listeners for resizing the box
+  let resizing = false;
 
- // 9. Add the box to the document and store it as the current box
- document.body.appendChild(box);
- currentBox = box;
+  resizeHandle.addEventListener("mousedown", (e) => {
+    e.stopPropagation(); // Prevent the box from being dragged when resizing
+    resizing = true;
+  
+    // Add the 'noselect' class to the content div while resizing
+    contentDiv.classList.add("noselect");
+  });
+  
+  document.addEventListener("mousemove", (e) => {
+    if (resizing) {
+      const newWidth = e.clientX - box.offsetLeft + 5;
+      const newHeight = e.clientY - box.offsetTop + 5;
+  
+      box.style.width = `${newWidth}px`;
+      box.style.height = `${newHeight}px`;
+    }
+  });
+  
+  document.addEventListener("mouseup", () => {
+    resizing = false;
+  
+    // Remove the 'noselect' class from the content div after resizing is finished
+    contentDiv.classList.remove("noselect");
+  });
 
- // 10. Close the box when clicking outside of it
- document.addEventListener("mousedown", closeBoxOnClickOutside, true);
+  // Create a separate div for the text content
+  const contentDiv = document.createElement("div");
+  contentDiv.textContent = text;
+  contentDiv.style.overflow = "auto"; // Enable scrollbars when the text overflows
+  contentDiv.style.width = "100%";
+  contentDiv.style.height = "100%";
+  box.appendChild(contentDiv);
 
- function closeBoxOnClickOutside(e) {
-   if (!box.contains(e.target)) {
-     if (document.body.contains(box)) {
-       document.body.removeChild(box);
-     }
-     currentBox = null;
-     document.removeEventListener("mousedown", closeBoxOnClickOutside, true);
-     isBoxDisplayed = false; // Reset the flag after closing the box
-   }
- }
+  document.body.appendChild(box);
+  currentBox = box; // Store the current box
 
- // Set isBoxDisplayed to true to prevent storeHighlightedText from being called
- // again until the current explanation box is closed
- isBoxDisplayed = true;
+  // Close the box when clicking outside of it
+  document.addEventListener("mousedown", closeBoxOnClickOutside, true);
+
+  function closeBoxOnClickOutside(e) {
+    if (!box.contains(e.target)) {
+      if (document.body.contains(box)) {
+        document.body.removeChild(box);
+      }
+      currentBox = null; // Clear the current box
+      document.removeEventListener("mousedown", closeBoxOnClickOutside, true);
+    }
+  }
 }
+
+
+
+// this is put here to mark a big change!! If it is broken undo until this disappears
