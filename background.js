@@ -1,6 +1,6 @@
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === "fetchExplanation") {
-    const { text, position } = request.data;
+    const { text, position, requestId } = request.data;
 
     const prompt = `Explain what this is: ${text}`;
     const explanation = await fetchExplanation(prompt);
@@ -11,11 +11,15 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
         data: {
           explanation,
           position,
+          requestId,
         },
       });
     });
   }
 });
+
+// ... (rest of the code)
+
 
 async function fetchExplanation(prompt) {
   const apiKey = await new Promise((resolve) => {
@@ -51,3 +55,6 @@ async function fetchExplanation(prompt) {
     return explanation;
   }
 }
+
+
+// this just shows where to undo to fi this breaks everything.

@@ -5,6 +5,7 @@ let selectedText = '';
 let isMouseInsideWindow = true;
 let mousePosition = { x: 0, y: 0 };
 let isBoxDisplayed = false; 
+let requestCounter = 0;
 
 // Style for disabling text selection while resizing the box
 const noSelectStyle = `
@@ -36,6 +37,13 @@ function isTextElement(element) {
 
 // Store highlighted text and show the loading box
 function storeHighlightedText() {
+  // Remove existing boxes (if any)
+  if (currentBox) {
+    document.body.removeChild(currentBox);
+    currentBox = null;
+  }
+  removeLoadingBox();
+
   selectedText = window.getSelection().toString().trim();
   if (selectedText) {
     console.log("Stored text:", selectedText);
@@ -46,12 +54,16 @@ function storeHighlightedText() {
     // Display the loading box
     showLoadingBox(boxPosition);
 
+    // Increment request counter
+    requestCounter++;
+
     // Send the selected text to the background script
     chrome.runtime.sendMessage({
       action: "fetchExplanation",
       data: {
         text: selectedText,
         position: boxPosition,
+        requestId: requestCounter,
       },
     });
   }
@@ -76,39 +88,42 @@ function getBoxPosition(rect) {
 }
 
 // Event listeners for mouseenter and mouseleave
-document.addEventListener("mouseenter", () => {
-  isMouseInsideWindow = true;
-  timeoutId = setTimeout(storeHighlightedText, 2000);
-});
-document.addEventListener("mouseout", (event) => {
-  if (event.relatedTarget === null) {
-    isMouseInsideWindow = false;
-  }
-});
+
 
 
 // Event listeners for mousedown and mouseup
-document.addEventListener("mousedown", () => {
-  if (isMouseInsideWindow) {
+// Add this new event listener
+document.addEventListener("mousedown", (event) => {
+  if (isMouseInsideWindow && !isBoxDisplayed && !event.target.closest("#loadingBox") && !event.target.closest("#explanationBox")) {
     timeoutId = setTimeout(storeHighlightedText, 2000);
   }
 });
+
+// Add this new event listener
+document.addEventListener("mouseup", () => {
+  if (!isBoxDisplayed) {
+    clearTimeout(timeoutId);
+  }
+});
+
 document.addEventListener("mouseup", (event) => {
   mousePosition.x = event.clientX;
   mousePosition.y = event.clientY;
-});
-document.addEventListener("mouseup", () => {
-  clearTimeout(timeoutId);
 });
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "showExplanation") {
-    const { explanation, position } = request.data;
-    showExplanationBox(explanation, position);
-    isBoxDisplayed = true; // Set the flag to true when the box is displayed
+    const { explanation, position, requestId } = request.data;
+
+    // Check if the received requestId matches the current requestCounter value
+    if (requestId === requestCounter) {
+      showExplanationBox(explanation, position);
+      isBoxDisplayed = true; // Set the flag to true when the box is displayed
+    }
   }
 });
+
 
 // Functions for showing and removing the loading box
 function showLoadingBox(position) {
@@ -161,8 +176,6 @@ function showExplanationBox(text, position) {
   Object.assign(box.style, {
     position: "fixed",
     width: "400px",
-    left: `${position.x}px`,
-    top: `${position.y}px`,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     color: "white",
     border: "3px solid gray",
@@ -195,8 +208,11 @@ function showExplanationBox(text, position) {
     backgroundColor: "gray",
     color: "black",
     border: "2px solid gray",
+    display: "flex", // Add this line
+    justifyContent: "center", // Add this line
+    alignItems: "center", // Add this line
   });
-  copyButton.textContent = "📋";
+  copyButton.innerHTML = "&#128203;";
   box.appendChild(copyButton);
 
   // 5. Add event listener for copying the text
@@ -269,7 +285,24 @@ function showExplanationBox(text, position) {
 
  // 9. Add the box to the document and store it as the current box
  document.body.appendChild(box);
- currentBox = box;
+
+  const boxRect = box.getBoundingClientRect();
+  const windowHeight = window.innerHeight;
+  const windowWidth = window.innerWidth;
+  const padding = 17; // Add a padding constant to ensure the box doesn't touch the borders
+
+  let top = position.y;
+  let left = position.x;
+
+  if (top + boxRect.height + padding > windowHeight) {
+    top = windowHeight - boxRect.height - padding;
+  }
+  if (left + boxRect.width + padding > windowWidth) {
+    left = windowWidth - boxRect.width - padding;
+  }
+
+  box.style.top = `${top}px`;
+  box.style.left = `${left}px`;
 
  // 10. Close the box when clicking outside of it
  document.addEventListener("mousedown", closeBoxOnClickOutside, true);
@@ -289,3 +322,5 @@ function showExplanationBox(text, position) {
  // again until the current explanation box is closed
  isBoxDisplayed = true;
 }
+
+//This is just here to show ehen to undo to if this breaks everything
