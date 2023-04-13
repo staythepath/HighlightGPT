@@ -36,17 +36,20 @@ function isTextElement(element) {
 
 // Store highlighted text and show the loading box
 function storeHighlightedText() {
+  if (isBoxDisplayed) { // Check if an explanation box is already being displayed
+    return; // Return without doing anything
+  }
+
   selectedText = window.getSelection().toString().trim();
   if (selectedText) {
     console.log("Stored text:", selectedText);
 
     const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
-    let boxPosition = getBoxPosition(rect);
+    const boxPosition = getBoxPosition(rect);
 
     // Display the loading box
     showLoadingBox(boxPosition);
 
-    // Send the selected text to the background script
     chrome.runtime.sendMessage({
       action: "fetchExplanation",
       data: {
@@ -56,8 +59,6 @@ function storeHighlightedText() {
     });
   }
 }
-
-
 
 function getBoxPosition(rect) {
   let boxPosition = {
@@ -194,7 +195,7 @@ function showExplanationBox(text, position) {
     borderRadius: "4px",
     backgroundColor: "gray",
     color: "black",
-    border: "2px solid gray",
+    border: "1px solid gray",
   });
   copyButton.textContent = "📋";
   box.appendChild(copyButton);

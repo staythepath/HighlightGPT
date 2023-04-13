@@ -1,19 +1,69 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
-    <title>Text Explanation</title>
+    <meta charset="utf-8" />
+    <title>My Extension</title>
+    <script src="popup.js"></script>
     <style>
       body {
-        width: 300px;
-        margin: 0;
-        padding: 10px;
+        background-color: rgba(30, 30, 30, 0.9);
+        color: #ffffff;
         font-family: Arial, sans-serif;
+        width: 300px;
+        padding: 10px;
+      }
+    
+      h1 {
+        text-align: center;
+        color: #000000;
+        margin-bottom: 10px;
+      }
+    
+      p {
+        text-align: center;
+        font-size: 14px;
+        line-height: 1.5;
+        margin: 0;
+        font-weight: bold;
+        color: #c0c0c0;
+      }
+    
+      input[type="text"] {
+        display: block;
+        width: 100%;
+        padding: 6px;
+        background-color: #a0a0a0;
+        color: #000000;
+        border: 2px solid #000000;
+        box-sizing: border-box;
+      }
+    
+      button[type="submit"] {
+        display: block;
+        width: 100%;
+        padding: 6px;
+        background-color: #d0d0d0;
+        color: #000000;
+        border: 1px solid #000000;
+        box-sizing: border-box;
+      }
+
+      label[type="text"] {
+        color: #000000;
       }
     </style>
+    
+    
   </head>
   <body>
-    <h1>Text Explanation</h1>
-    <p>Select text on a webpage and hold the left mouse button for 2 seconds to get an explanation.</p>
+    <h1>Enter API Key</h1>
+      <p>Select text on a webpage and hold the left mouse button for 2 seconds to get an explanation. It doesn't work without your api key. I'm not stealing it, you can look at the code yourself. It's a bit buggy but it kinda works.</p>
+    <div id="apiKeyContainer">
+      <form id="apiKeyForm">
+        <label for="apiKey">API Key:</label>
+        <input type="text" id="apiKey" name="apiKey" />
+        <button type="submit">Save</button>
+      </form>
+    </div>
   </body>
 </html>
