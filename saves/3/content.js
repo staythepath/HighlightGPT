@@ -3,8 +3,6 @@ let currentBox = null;
 let timeoutId = null;
 let selectedText = '';
 let isMouseInsideWindow = true;
-let isDragging = false;
-let dragOffset = { x: 0, y: 0 };
 let mousePosition = { x: 0, y: 0 };
 let isBoxDisplayed = false; 
 let requestCounter = 0;
@@ -18,11 +16,8 @@ const noSelectStyle = `
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    border-radius: 10px; // Add border-radius property
   }
 `;
-
-
 
 // Add noSelectStyle to the document head
 const styleElement = document.createElement("style");
@@ -42,8 +37,6 @@ function isTextElement(element) {
 
 // Store highlighted text and show the loading box
 function storeHighlightedText() {
-  
-
   // Remove existing boxes (if any)
   if (currentBox) {
     document.body.removeChild(currentBox);
@@ -55,8 +48,8 @@ function storeHighlightedText() {
   if (selectedText) {
     console.log("Stored text:", selectedText);
 
-    
-    let boxPosition = getBoxPosition();
+    const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    let boxPosition = getBoxPosition(rect);
 
     // Display the loading box
     showLoadingBox(boxPosition);
@@ -78,11 +71,10 @@ function storeHighlightedText() {
 
 
 
-function getBoxPosition() {
-  
+function getBoxPosition(rect) {
   let boxPosition = {
-    x: mousePosition.x,
-    y: mousePosition.y,
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height,
   };
 
   if (mousePosition.x < 0 || mousePosition.x > window.innerWidth || mousePosition.y < 0 || mousePosition.y > window.innerHeight) {
@@ -91,55 +83,46 @@ function getBoxPosition() {
       y: window.innerHeight / 2,
     };
   }
-  console.log("Box position:", boxPosition);
+
   return boxPosition;
 }
 
+// Event listeners for mouseenter and mouseleave
+
+
 
 // Event listeners for mousedown and mouseup
+// Add this new event listener
 document.addEventListener("mousedown", (event) => {
   if (isMouseInsideWindow && !isBoxDisplayed && !event.target.closest("#loadingBox") && !event.target.closest("#explanationBox")) {
     timeoutId = setTimeout(storeHighlightedText, 2000);
   }
 });
 
-document.addEventListener("mousedown", (event) => {
-  const loadingBox = document.getElementById("loadingBox");
-  if (loadingBox && !event.target.closest("#loadingBox")) {
-    closeLoadingBoxAndResetCounter();
-  }
-}, true);
-
+// Add this new event listener
 document.addEventListener("mouseup", () => {
   if (!isBoxDisplayed) {
     clearTimeout(timeoutId);
   }
 });
-document.addEventListener("mousemove", (event) => {
+
+document.addEventListener("mouseup", (event) => {
   mousePosition.x = event.clientX;
   mousePosition.y = event.clientY;
 });
-
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "showExplanation") {
     const { explanation, position, requestId } = request.data;
 
-    // Get the position of the loading box
-    const loadingBox = document.getElementById("loadingBox");
-    const loadingBoxPosition = loadingBox
-      ? { x: loadingBox.offsetLeft, y: loadingBox.offsetTop }
-      : position;
-
     // Check if the received requestId matches the current requestCounter value
     if (requestId === requestCounter) {
-      showExplanationBox(explanation, loadingBoxPosition);
+      showExplanationBox(explanation, position);
       isBoxDisplayed = true; // Set the flag to true when the box is displayed
     }
   }
 });
-
 
 
 // Functions for showing and removing the loading box
@@ -152,13 +135,9 @@ function showLoadingBox(position) {
     top: `${position.y}px`,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     color: "white",
-    border: "2px solid gray",
+    border: "3px solid gray",
     padding: "10px",
     zIndex: 10000,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: "10px",
   });
 
   loadingBox.id = "loadingBox";
@@ -166,7 +145,7 @@ function showLoadingBox(position) {
   document.body.appendChild(loadingBox);
 
   let ellipsesCount = 0;
-  const maxEllipses = 3;
+  const maxEllipses = 30;
   const ellipsesInterval = setInterval(() => {
     ellipsesCount = (ellipsesCount + 1) % (maxEllipses + 1);
     loadingBox.textContent = "Loading" + ".".repeat(ellipsesCount);
@@ -174,27 +153,6 @@ function showLoadingBox(position) {
 
   // Store the interval ID as a data attribute so it can be cleared later
   loadingBox.dataset.intervalId = ellipsesInterval;
-  loadingBox.onmousedown = (e) => dragMouseDown(e, loadingBox);
-
-
-}
-
-function dragMouseDown(e, element) {
-  if (isTextElement(e.target)) {
-    return;
-  }
-
-  isDragging = true;
-  dragOffset.x = e.clientX - element.offsetLeft;
-  dragOffset.y = e.clientY - element.offsetTop;
-  document.onmousemove = (event) => dragMouseMove(event, element, dragOffset);
-  document.onmouseup = closeDragElement;
-}
-
-function closeDragElement() {
-  isDragging = false;
-  document.onmousemove = null;
-  document.onmouseup = null;
 }
 
 function removeLoadingBox() {
@@ -203,17 +161,6 @@ function removeLoadingBox() {
     clearInterval(loadingBox.dataset.intervalId); // Clear the ellipses interval
     document.body.removeChild(loadingBox);
   }
-}
-
-function closeLoadingBoxAndResetCounter() {
-  removeLoadingBox();
-  requestCounter = 0;
-}
-
-function dragMouseMove(e, element, dragOffset) {
-  e.preventDefault();
-  element.style.left = e.clientX - dragOffset.x + "px";
-  element.style.top = e.clientY - dragOffset.y + "px";
 }
 
 // Function for showing the explanation box
@@ -234,7 +181,6 @@ function showExplanationBox(text, position) {
     border: "3px solid gray",
     padding: "10px",
     zIndex: 10000,
-    borderRadius: "10px", // add this line
   });
 
   // 3. Create and add the resize handle
@@ -281,17 +227,30 @@ function showExplanationBox(text, position) {
   });
 
   // 6. Make the box draggable
-  // 6. Make the box draggable
-  box.onmousedown = (e) => dragMouseDown(e, box);
-
+  box.onmousedown = dragMouseDown;
   let dragOffset = { x: 0, y: 0 };
 
+  function dragMouseDown(e) {
+    if (isTextElement(e.target)) {
+      return;
+    }
+    isDragging = true;
+    dragOffset.x = e.clientX - box.offsetLeft;
+    dragOffset.y = e.clientY - box.offsetTop;
+    document.onmousemove = dragMouseMove;
+    document.onmouseup = closeDragElement;
+  }
+  
+  function dragMouseMove(e) {
+    e.preventDefault();
+    box.style.left = e.clientX - dragOffset.x + "px";
+    box.style.top = e.clientY - dragOffset.y + "px";
+  }
 
-  
-  
-  
-
-  
+  function closeDragElement() {
+    document.onmousemove = null;
+    document.onmouseup = null;
+  }
    // 7. Add event listeners for resizing the box
    let resizing = false;
 
@@ -342,8 +301,8 @@ function showExplanationBox(text, position) {
     left = windowWidth - boxRect.width - padding;
   }
 
-  box.style.top = `${position.y}px`;
-  box.style.left = `${position.x}px`;
+  box.style.top = `${top}px`;
+  box.style.left = `${left}px`;
 
  // 10. Close the box when clicking outside of it
  document.addEventListener("mousedown", closeBoxOnClickOutside, true);

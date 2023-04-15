@@ -3,8 +3,6 @@ let currentBox = null;
 let timeoutId = null;
 let selectedText = '';
 let isMouseInsideWindow = true;
-let isDragging = false;
-let dragOffset = { x: 0, y: 0 };
 let mousePosition = { x: 0, y: 0 };
 let isBoxDisplayed = false; 
 let requestCounter = 0;
@@ -126,20 +124,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "showExplanation") {
     const { explanation, position, requestId } = request.data;
 
-    // Get the position of the loading box
-    const loadingBox = document.getElementById("loadingBox");
-    const loadingBoxPosition = loadingBox
-      ? { x: loadingBox.offsetLeft, y: loadingBox.offsetTop }
-      : position;
-
     // Check if the received requestId matches the current requestCounter value
     if (requestId === requestCounter) {
-      showExplanationBox(explanation, loadingBoxPosition);
+      showExplanationBox(explanation, position);
       isBoxDisplayed = true; // Set the flag to true when the box is displayed
     }
   }
 });
-
 
 
 // Functions for showing and removing the loading box
@@ -174,27 +165,19 @@ function showLoadingBox(position) {
 
   // Store the interval ID as a data attribute so it can be cleared later
   loadingBox.dataset.intervalId = ellipsesInterval;
-  loadingBox.onmousedown = (e) => dragMouseDown(e, loadingBox);
 
 
 }
 
-function dragMouseDown(e, element) {
+function dragMouseDown(e) {
   if (isTextElement(e.target)) {
     return;
   }
-
   isDragging = true;
-  dragOffset.x = e.clientX - element.offsetLeft;
-  dragOffset.y = e.clientY - element.offsetTop;
-  document.onmousemove = (event) => dragMouseMove(event, element, dragOffset);
+  dragOffset.x = e.clientX - box.offsetLeft;
+  dragOffset.y = e.clientY - box.offsetTop;
+  document.onmousemove = dragMouseMove;
   document.onmouseup = closeDragElement;
-}
-
-function closeDragElement() {
-  isDragging = false;
-  document.onmousemove = null;
-  document.onmouseup = null;
 }
 
 function removeLoadingBox() {
@@ -208,12 +191,6 @@ function removeLoadingBox() {
 function closeLoadingBoxAndResetCounter() {
   removeLoadingBox();
   requestCounter = 0;
-}
-
-function dragMouseMove(e, element, dragOffset) {
-  e.preventDefault();
-  element.style.left = e.clientX - dragOffset.x + "px";
-  element.style.top = e.clientY - dragOffset.y + "px";
 }
 
 // Function for showing the explanation box
@@ -288,10 +265,16 @@ function showExplanationBox(text, position) {
 
 
   
-  
-  
+  function dragMouseMove(e) {
+    e.preventDefault();
+    box.style.left = e.clientX - dragOffset.x + "px";
+    box.style.top = e.clientY - dragOffset.y + "px";
+  }
 
-  
+  function closeDragElement() {
+    document.onmousemove = null;
+    document.onmouseup = null;
+  }
    // 7. Add event listeners for resizing the box
    let resizing = false;
 
@@ -342,8 +325,8 @@ function showExplanationBox(text, position) {
     left = windowWidth - boxRect.width - padding;
   }
 
-  box.style.top = `${position.y}px`;
-  box.style.left = `${position.x}px`;
+  box.style.top = `${top}px`;
+  box.style.left = `${left}px`;
 
  // 10. Close the box when clicking outside of it
  document.addEventListener("mousedown", closeBoxOnClickOutside, true);
